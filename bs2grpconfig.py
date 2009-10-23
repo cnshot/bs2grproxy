@@ -7,9 +7,9 @@ from google.appengine.ext import db
 
 # You can set them later directly in Database
 # HTML target url
-TARGET_HOST = "www.martby.com"
+TARGET_HOST = "www.google.com"
 # Static target url
-STATIC_HOST = "www.martby.com"
+STATIC_HOST = "www.google.com"
 # Redirect css/js files to static host
 CSSJS_REDIRECT = False
 # Cache check option. value can be 'EOD' or 0 <= number.
