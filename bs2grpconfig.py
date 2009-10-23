@@ -1,6 +1,7 @@
-# GAPP Reverse Proxy by BS2
+# BS2 GAE Reverse Proxy
+# Russell <yufeiwu@gmail.com>
 # Please use wisely
-# yufeiwu@gmail.com
+
 
 from google.appengine.ext import db
 

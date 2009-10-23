@@ -1,6 +1,7 @@
-# GAPP Reverse Proxy by BS2
+# BS2 GAE Reverse Proxy
+# Russell <yufeiwu@gmail.com>
 # Please use wisely
-# yufeiwu@gmail.com
+
 
 from google.appengine.ext import db
 from email import utils
@@ -22,11 +23,15 @@ def string_to_datetime(s):
 class BS2GRPFile(db.Model):
     path = db.StringProperty(required=True)
     etag = db.StringProperty(required=False, default=None)
+    status_code = db.IntegerProperty(required=False, default=200)
     mdatetime = db.DateTimeProperty(required=False)
     last_check = db.DateTimeProperty(required=False)
     content_type = db.StringProperty(required=False, default=None)
     content_length = db.IntegerProperty(required=False, default=None)
     units = db.ListProperty(db.Blob)
+    headers = db.StringListProperty()
+
+    INTERESTED_HEADERS = ['etag', 'content-type', 'location']
 
     UNIT_LIMIT = 1024 * 1024 # 1 MB per unit
 
@@ -47,9 +52,10 @@ class BS2GRPFile(db.Model):
             return True
 
         now = datetime.datetime.now()
+        diff = now - self.last_check
         if option == 'EOD':
             # End of day scheme
-            if now.day != self.last_check.day:
+            if diff.days > 1 or now.day != self.last_check.day:
                 return True
         elif not option or option == '0':
             # Check every time
@@ -57,7 +63,6 @@ class BS2GRPFile(db.Model):
         else:
             # Check after x days
             option = int(option)
-            diff = now - self.last_check
             if diff.days >= option:
                 return True
 
@@ -84,6 +89,12 @@ class BS2GRPFile(db.Model):
         self.content_length = None
         self.units = []
 
+    def clear_headers(self):
+        self.mdatetime = None
+        self.content_type = None
+        self.content_length = None
+        self.headers = []
+
     def from_string_io(self, io):
         r = io.read(BS2GRPFile.UNIT_LIMIT)
         while len(r) > 0:
@@ -95,6 +106,18 @@ class BS2GRPFile(db.Model):
         if self.mdatetime: headers['Last-Modified'] = str(self.get_mdate())
         if self.content_type: headers['Content-Type'] = str(self.content_type)
         if self.content_length: headers['Content-Length'] = str(self.content_length)
+        for i in self.headers:
+            k, v = i.split(':', 1)
+            headers[str(k)] = str(v)
+
+    def from_headers(self, headers):
+        self.etag = headers.get('ETag', None)
+        self.mdatetime = string_to_datetime(headers.get('Last-Modified', None))
+        self.content_type = headers.get('Content-Type', None)
+        for k in headers.keys():
+            if k.lower() in BS2GRPFile.INTERESTED_HEADERS:
+                header = "%s:%s" % (k, headers[k])
+                self.headers.append(header)
 
     def get_mdate(self):
         return datetime_to_string(self.mdatetime)

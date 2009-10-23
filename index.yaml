@@ -1,0 +1,8 @@
+indexes:
+
+- kind: BS2GRPFile
+  ancestor: no
+  properties:
+  - name: path
+  - name: mdatetime
+    direction: desc
