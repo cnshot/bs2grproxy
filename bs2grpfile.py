@@ -22,21 +22,23 @@ def string_to_datetime(s):
 # This model can overcome the limit of 1MB of data store for a single file IN THEORY
 class BS2GRPFile(db.Model):
     path = db.StringProperty(required=True)
-    etag = db.StringProperty(required=False, default=None)
     status_code = db.IntegerProperty(required=False, default=200)
     mdatetime = db.DateTimeProperty(required=False)
     last_check = db.DateTimeProperty(required=False)
-    content_type = db.StringProperty(required=False, default=None)
-    content_length = db.IntegerProperty(required=False, default=None)
+    content_type = db.StringProperty(required=False, default='')
+    content_length = db.IntegerProperty(required=False, default=0)
     units = db.ListProperty(db.Blob)
     headers = db.StringListProperty()
 
-    INTERESTED_HEADERS = ['etag', 'content-type', 'location']
+    INTERESTED_HEADERS = ['etag', 'location']
 
     UNIT_LIMIT = 1024 * 1024 # 1 MB per unit
 
     @staticmethod
     def get_file(path, after_date = None, before_date = None):
+        if not after_date and not before_date:
+            return BS2GRPFile.get_by_key_name(path)
+
         ret = BS2GRPFile.all()
         ret.filter('path =', path)
         if after_date:
@@ -102,7 +104,6 @@ class BS2GRPFile(db.Model):
             r = io.read(BS2GRPFile.UNIT_LIMIT)
 
     def to_headers(self, headers):
-        if self.etag: headers['ETag'] = str(self.etag)
         if self.mdatetime: headers['Last-Modified'] = str(self.get_mdate())
         if self.content_type: headers['Content-Type'] = str(self.content_type)
         if self.content_length: headers['Content-Length'] = str(self.content_length)
@@ -111,7 +112,6 @@ class BS2GRPFile(db.Model):
             headers[str(k)] = str(v)
 
     def from_headers(self, headers):
-        self.etag = headers.get('ETag', None)
         self.mdatetime = string_to_datetime(headers.get('Last-Modified', None))
         self.content_type = headers.get('Content-Type', None)
         for k in headers.keys():
