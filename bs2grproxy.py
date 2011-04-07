@@ -121,7 +121,7 @@ class BS2GRProxy(webapp.RequestHandler):
                 logging.info("Requesting target: " + new_path)
                 for _ in range(config.retry):
                     try:
-                        resp = urlfetch.fetch(new_path, self.request.body, method, newHeaders, False, False)
+                        resp = urlfetch.fetch(new_path, self.request.body, method, newHeaders, False, False, 10)
                         fetched = True
                         break
                     except urlfetch_errors.ResponseTooLargeError:
@@ -191,14 +191,38 @@ class BS2GRProxy(webapp.RequestHandler):
 
     def _resp_to_response(self, resp):
         self.response.set_status(resp.status_code)
-        textContent = True
+        text_content = True
         for header in resp.headers:
             if header.strip().lower() in self.IgnoreHeaders:
+                # don"t forward
                 continue
-
+            # there may have some problems on multi-cookie process in urlfetch.
+            if header.lower() == "set-cookie":
+                scs = resp.headers[header].split(",")
+                nsc = ""
+                for sc in scs:
+                    if nsc == "":
+                        nsc = sc
+                    elif re.match(r"[ \t]*[0-9]", sc):
+                        # expires 2nd part
+                        nsc += "," + sc
+                    else:
+                        # new one
+                        self.response.headers.add_header("Set-Cookie", nsc.strip())
+                        nsc = sc
+                if nsc != "":
+                    self.response.headers.add_header("Set-Cookie", nsc.strip())
+                continue
+            # other
             self.response.headers[header] = resp.headers[header]
+            # check Content-Type
+            if header.lower() == "content-type":
+                if resp.headers[header].lower().find("text") == -1:
+                    # not text
+                    text_content = False
 
         self.response.out.write(resp.content)
+        
 
     def post(self):
         return self.process(False)
